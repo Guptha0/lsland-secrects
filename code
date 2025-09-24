@@ -1,0 +1,470 @@
+#!/usr/bin/env python3
+"""
+ISLAND SECRETS - Adventure Mystery Game
+A beautiful text-based adventure with RPG elements
+"""
+
+import random
+import time
+import sys
+import os
+from datetime import datetime
+from typing import Dict, List, Optional
+
+class GameEngine:
+    def __init__(self):
+        self.player = {
+            "name": "",
+            "health": 100,
+            "max_health": 100,
+            "inventory": [],
+            "discovered_locations": [],
+            "solved_mysteries": [],
+            "current_location": "beach",
+            "day": 1,
+            "time": "morning"
+        }
+        
+        self.locations = {
+            "beach": {
+                "name": "Sunset Beach",
+                "description": "White sandy beach with crystal clear waters. Strange symbols are carved into nearby rocks.",
+                "items": ["seashell", "driftwood"],
+                "connections": ["jungle", "caves", "cliffs"],
+                "mystery_clue": "The tide patterns seem unnatural here."
+            },
+            "jungle": {
+                "name": "Ancient Jungle",
+                "description": "Dense tropical jungle with massive trees. You hear strange animal calls in the distance.",
+                "items": ["medicinal herbs", "vine rope"],
+                "connections": ["beach", "waterfall", "ancient_temple"],
+                "mystery_clue": "Some trees have glowing moss that pulses rhythmically."
+            },
+            "caves": {
+                "name": "Sea Caves",
+                "description": "Dark, echoing caves with bioluminescent fungi. Water drips from the ceiling.",
+                "items": ["ancient artifact", "crystal shard"],
+                "connections": ["beach", "underground_river"],
+                "mystery_clue": "Ancient paintings depict star constellations."
+            },
+            "waterfall": {
+                "name": "Crystal Waterfall",
+                "description": "A magnificent waterfall cascading into a pristine pool. The water has a faint blue glow.",
+                "items": ["healing water", "rare orchid"],
+                "connections": ["jungle", "hidden_grove"],
+                "mystery_clue": "The waterfall flows upward during moonrise."
+            },
+            "ancient_temple": {
+                "name": "Ancient Temple",
+                "description": "Crumbling stone temple covered in vines. Strange energy hums in the air.",
+                "items": ["golden key", "stone tablet"],
+                "connections": ["jungle"],
+                "mystery_clue": "The temple walls show a map of the island's energy lines."
+            },
+            "cliffs": {
+                "name": "Eagle Cliffs",
+                "description": "High cliffs overlooking the ocean. Giant eagles nest here.",
+                "items": ["eagle feather", "observation notes"],
+                "connections": ["beach", "volcano"],
+                "mystery_clue": "The eagles only fly in geometric patterns."
+            },
+            "volcano": {
+                "name": "Smoking Volcano",
+                "description": "A dormant volcano with geothermal vents. The air smells of sulfur and ozone.",
+                "items": ["volcanic crystal", "ancient journal"],
+                "connections": ["cliffs", "observatory"],
+                "mystery_clue": "The lava flows form mathematical equations."
+            },
+            "observatory": {
+                "name": "Mysterious Observatory",
+                "description": "An ancient stone observatory with crystal lenses pointing to the sky.",
+                "items": ["star chart", "energy core"],
+                "connections": ["volcano"],
+                "mystery_clue": "THIS IS THE FINAL MYSTERY LOCATION"
+            },
+            "hidden_grove": {
+                "name": "Hidden Grove",
+                "description": "A secret grove where time seems to stand still. Magical creatures watch you.",
+                "items": ["time crystal", "wisdom fruit"],
+                "connections": ["waterfall"],
+                "mystery_clue": "The grove exists outside normal spacetime."
+            },
+            "underground_river": {
+                "name": "Underground River",
+                "description": "A glowing river flowing through caverns filled with crystals.",
+                "items": ["glowing pearl", "fossil"],
+                "connections": ["caves"],
+                "mystery_clue": "The river flows both ways simultaneously."
+            }
+        }
+        
+        self.mysteries = {
+            "time_anomaly": {
+                "name": "Time Anomaly",
+                "description": "Time flows differently in various parts of the island.",
+                "solution_items": ["time crystal", "ancient artifact"],
+                "solved": False,
+                "clue": "Certain locations experience time dilation effects."
+            },
+            "energy_grid": {
+                "name": "Alien Energy Grid",
+                "description": "The island sits on a powerful energy grid of unknown origin.",
+                "solution_items": ["energy core", "crystal shard", "volcanic crystal"],
+                "solved": False,
+                "clue": "Geometric patterns of energy connect key locations."
+            },
+            "ancient_civilization": {
+                "name": "Lost Civilization",
+                "description": "An advanced civilization once inhabited this island.",
+                "solution_items": ["stone tablet", "ancient journal", "golden key"],
+                "solved": False,
+                "clue": "Artifacts suggest technological marvels beyond our understanding."
+            }
+        }
+        
+        self.colors = {
+            "red": "\033[91m",
+            "green": "\033[92m",
+            "yellow": "\033[93m",
+            "blue": "\033[94m",
+            "purple": "\033[95m",
+            "cyan": "\033[96m",
+            "white": "\033[97m",
+            "bold": "\033[1m",
+            "end": "\033[0m"
+        }
+
+    def clear_screen(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+    def type_text(self, text, speed=0.03):
+        """Typewriter effect for text"""
+        for char in text:
+            print(char, end='', flush=True)
+            time.sleep(speed)
+        print()
+
+    def print_header(self):
+        """Display beautiful game header"""
+        header = f"""
+{self.colors['cyan']}{self.colors['bold']}
+╔════════════════════════════════════════════════════════════════╗
+║                       ISLAND SECRETS                           ║
+║                 The Mysterious Adventure                       ║
+╚════════════════════════════════════════════════════════════════╝
+{self.colors['end']}"""
+        print(header)
+
+    def print_location(self):
+        """Display current location beautifully"""
+        loc = self.locations[self.player["current_location"]]
+        print(f"\n{self.colors['yellow']}{self.colors['bold']}🌴 {loc['name']} 🌴{self.colors['end']}")
+        print(f"{self.colors['green']}{loc['description']}{self.colors['end']}")
+        
+        # Show available items
+        if loc['items']:
+            print(f"\n{self.colors['cyan']}Items here: {', '.join(loc['items'])}{self.colors['end']}")
+        
+        # Show connections
+        connections = [self.locations[conn]['name'] for conn in loc['connections']]
+        print(f"{self.colors['blue']}Paths to: {', '.join(connections)}{self.colors['end']}")
+
+    def show_status(self):
+        """Display player status"""
+        print(f"\n{self.colors['purple']}=== DAY {self.player['day']} - {self.player['time'].upper()} ==={self.colors['end']}")
+        print(f"{self.colors['green']}❤️  Health: {self.player['health']}/{self.player['max_health']}{self.colors['end']}")
+        print(f"{self.colors['yellow']}🎒 Inventory: {', '.join(self.player['inventory']) if self.player['inventory'] else 'Empty'}{self.colors['end']}")
+        print(f"{self.colors['cyan']}🔍 Mysteries Solved: {len(self.player['solved_mysteries'])}/3{self.colors['end']}")
+
+    def move(self, direction):
+        """Handle player movement"""
+        current = self.player["current_location"]
+        connections = self.locations[current]["connections"]
+        
+        # Map directions to connections
+        dir_map = {
+            "north": 0, "south": 1, "east": 2, "west": 3,
+            "up": 4, "down": 5, "forward": 6, "back": 7
+        }
+        
+        if direction in dir_map and dir_map[direction] < len(connections):
+            new_loc = connections[dir_map[direction]]
+            self.player["current_location"] = new_loc
+            
+            # Add to discovered locations if new
+            if new_loc not in self.player["discovered_locations"]:
+                self.player["discovered_locations"].append(new_loc)
+                print(f"\n{self.colors['green']}✨ New location discovered! ✨{self.colors['end']}")
+            
+            # Progress time
+            self.advance_time()
+            return True
+        else:
+            print(f"\n{self.colors['red']}You can't go that way!{self.colors['end']}")
+            return False
+
+    def advance_time(self):
+        """Advance game time"""
+        time_cycle = ["morning", "afternoon", "evening", "night"]
+        current_index = time_cycle.index(self.player["time"])
+        
+        if current_index == 3:  # If it was night, advance day
+            self.player["day"] += 1
+            self.player["time"] = "morning"
+            # Restore some health each morning
+            self.player["health"] = min(self.player["max_health"], self.player["health"] + 20)
+            print(f"\n{self.colors['yellow']}🌅 A new day dawns on the island...{self.colors['end']}")
+        else:
+            self.player["time"] = time_cycle[current_index + 1]
+
+    def collect_item(self, item_name):
+        """Collect an item from current location"""
+        loc = self.locations[self.player["current_location"]]
+        
+        if item_name in loc["items"]:
+            self.player["inventory"].append(item_name)
+            loc["items"].remove(item_name)
+            print(f"\n{self.colors['green']}✅ You collected: {item_name}{self.colors['end']}")
+            return True
+        else:
+            print(f"\n{self.colors['red']}That item isn't here!{self.colors['end']}")
+            return False
+
+    def solve_mystery(self):
+        """Check if player can solve any mysteries"""
+        for mystery_id, mystery in self.mysteries.items():
+            if not mystery["solved"]:
+                has_items = all(item in self.player["inventory"] for item in mystery["solution_items"])
+                if has_items:
+                    mystery["solved"] = True
+                    self.player["solved_mysteries"].append(mystery_id)
+                    
+                    print(f"\n{self.colors['cyan']}{self.colors['bold']}")
+                    print("✨ MYSTERY SOLVED! ✨")
+                    print(f"{mystery['name']}")
+                    print(f"{mystery['description']}")
+                    print(f"{self.colors['end']}")
+                    
+                    # Reward for solving mystery
+                    if mystery_id == "time_anomaly":
+                        self.player["max_health"] += 20
+                        self.player["health"] = self.player["max_health"]
+                        print(f"{self.colors['green']}Reward: Maximum health increased!{self.colors['end']}")
+                    elif mystery_id == "energy_grid":
+                        self.player["inventory"].append("energy_amplifier")
+                        print(f"{self.colors['green']}Reward: Energy amplifier added to inventory!{self.colors['end']}")
+                    elif mystery_id == "ancient_civilization":
+                        print(f"{self.colors['green']}You now understand the island's secrets!{self.colors['end']}")
+                    
+                    return True
+        return False
+
+    def show_help(self):
+        """Display help information"""
+        help_text = f"""
+{self.colors['cyan']}{self.colors['bold']}
+=== ISLAND SECRETS - COMMANDS ==={self.colors['end']}
+{self.colors['yellow']}
+Exploration:
+  go [direction]    - Move in direction (north, south, east, west, up, down)
+  look              - Examine current location
+  map               - Show discovered locations
+
+Actions:
+  take [item]       - Collect an item
+  inventory         - Check your inventory
+  use [item]        - Use an item (combine with mysteries)
+
+Game:
+  status            - Show player status
+  mysteries         - List unsolved mysteries
+  help              - Show this help message
+  quit              - Exit the game
+
+Tips:
+- Explore every location thoroughly
+- Some items are needed to solve mysteries
+- The island has time-based events
+- Pay attention to environmental clues
+{self.colors['end']}"""
+        print(help_text)
+
+    def show_map(self):
+        """Display map of discovered locations"""
+        print(f"\n{self.colors['cyan']}{self.colors['bold']}=== DISCOVERED MAP ==={self.colors['end']}")
+        for loc_id in self.player["discovered_locations"]:
+            loc = self.locations[loc_id]
+            marker = "📍" if loc_id == self.player["current_location"] else "○"
+            print(f"{marker} {loc['name']}")
+
+    def show_mysteries(self):
+        """Display current mysteries"""
+        print(f"\n{self.colors['purple']}{self.colors['bold']}=== ISLAND MYSTERIES ==={self.colors['end']}")
+        for mystery_id, mystery in self.mysteries.items():
+            status = "✅ SOLVED" if mystery["solved"] else "❌ UNSOLVED"
+            color = self.colors['green'] if mystery["solved"] else self.colors['yellow']
+            print(f"\n{color}{mystery['name']} - {status}{self.colors['end']}")
+            print(f"Clue: {mystery['clue']}")
+            if not mystery["solved"]:
+                print(f"Required items: {', '.join(mystery['solution_items'])}")
+
+    def random_event(self):
+        """Trigger random events"""
+        if random.random() < 0.3:  # 30% chance
+            events = [
+                ("A sudden rainstorm refreshes the island.", 10),
+                ("You discover a hidden path!", 0),
+                ("Strange lights appear in the sky.", 0),
+                ("You feel a mysterious energy surge.", -5),
+                ("Wild animals approach but mean no harm.", 0),
+                ("You find a healing fruit on the ground.", 15)
+            ]
+            event, health_effect = random.choice(events)
+            
+            print(f"\n{self.colors['blue']}💫 Random Event: {event}{self.colors['end']}")
+            if health_effect != 0:
+                self.player["health"] = max(0, min(self.player["max_health"], self.player["health"] + health_effect))
+                if health_effect > 0:
+                    print(f"{self.colors['green']}Health +{health_effect}{self.colors['end']}")
+                else:
+                    print(f"{self.colors['red']}Health {health_effect}{self.colors['end']}")
+
+    def check_win_condition(self):
+        """Check if player has won the game"""
+        if len(self.player["solved_mysteries"]) == 3:
+            return True
+        return False
+
+    def show_ending(self):
+        """Display winning ending"""
+        self.clear_screen()
+        ending = f"""
+{self.colors['cyan']}{self.colors['bold']}
+╔════════════════════════════════════════════════════════════════╗
+║                      CONGRATULATIONS!                          ║
+╚════════════════════════════════════════════════════════════════╝
+{self.colors['end']}
+
+{self.colors['green']}
+You have solved all the mysteries of the island!
+
+The ancient civilization's technology awakens around you.
+A beautiful crystal ship emerges from the observatory, ready to take you home.
+
+But now you understand - this island is a sanctuary, a place of wonder
+that protects ancient knowledge. You leave as its guardian, forever
+connected to its secrets.
+
+Thank you for playing ISLAND SECRETS!
+{self.colors['end']}
+
+Game Stats:
+- Days spent on island: {self.player['day']}
+- Locations discovered: {len(self.player['discovered_locations'])}
+- Items collected: {len(self.player['inventory'])}
+- Final health: {self.player['health']}/{self.player['max_health']}
+"""
+
+        self.type_text(ending, 0.02)
+
+    def start_game(self):
+        """Main game loop"""
+        self.clear_screen()
+        self.print_header()
+        
+        # Introduction
+        intro = f"""
+{self.colors['green']}
+You wake up on a mysterious beach, the waves gently lapping at your feet.
+The last thing you remember is your ship going down in a storm...
+
+This island is unlike any place you've seen before. Strange energies pulse
+through the air, and ancient secrets wait to be uncovered.
+
+Your goal: Solve the island's three great mysteries and find a way home.
+{self.colors['end']}"""
+
+        self.type_text(intro, 0.03)
+        
+        # Get player name
+        print(f"\n{self.colors['yellow']}What is your name, explorer?{self.colors['end']}")
+        self.player["name"] = input("> ").strip()
+        
+        print(f"\n{self.colors['green']}Welcome, {self.player['name']}! Your adventure begins now...{self.colors['end']}")
+        input("\nPress Enter to continue...")
+        
+        # Main game loop
+        while self.player["health"] > 0:
+            self.clear_screen()
+            self.print_header()
+            self.show_status()
+            self.print_location()
+            
+            # Check for win condition
+            if self.check_win_condition():
+                self.show_ending()
+                break
+            
+            # Get player command
+            print(f"\n{self.colors['cyan']}What would you like to do?{self.colors['end']}")
+            command = input("> ").lower().strip()
+            
+            # Process commands
+            if command in ["quit", "exit"]:
+                print(f"\n{self.colors['yellow']}Thanks for playing!{self.colors['end']}")
+                break
+            elif command == "help":
+                self.show_help()
+                input("\nPress Enter to continue...")
+            elif command == "status":
+                self.show_status()
+                input("\nPress Enter to continue...")
+            elif command == "map":
+                self.show_map()
+                input("\nPress Enter to continue...")
+            elif command == "mysteries":
+                self.show_mysteries()
+                input("\nPress Enter to continue...")
+            elif command == "look":
+                # Already showing location, just wait
+                input("\nPress Enter to continue...")
+            elif command == "inventory":
+                print(f"\n{self.colors['yellow']}🎒 Your inventory: {', '.join(self.player['inventory']) if self.player['inventory'] else 'Empty'}{self.colors['end']}")
+                input("\nPress Enter to continue...")
+            elif command.startswith("go "):
+                direction = command[3:]
+                if self.move(direction):
+                    self.random_event()
+                    self.solve_mystery()
+            elif command.startswith("take "):
+                item = command[5:]
+                self.collect_item(item)
+                self.solve_mystery()
+                input("\nPress Enter to continue...")
+            elif command.startswith("use "):
+                item = command[4:]
+                if item in self.player["inventory"]:
+                    print(f"\n{self.colors['blue']}You use the {item}...{self.colors['end']}")
+                    # Item usage could be expanded with more complex puzzles
+                    self.solve_mystery()
+                else:
+                    print(f"\n{self.colors['red']}You don't have that item!{self.colors['end']}")
+                input("\nPress Enter to continue...")
+            else:
+                print(f"\n{self.colors['red']}Unknown command. Type 'help' for available commands.{self.colors['end']}")
+                input("\nPress Enter to continue...")
+            
+            # Small health drain over time
+            self.player["health"] -= 1
+            
+        # Game over if health reaches 0
+        if self.player["health"] <= 0:
+            print(f"\n{self.colors['red']}Your adventure ends here... but the island's mysteries remain.{self.colors['end']}")
+
+def main():
+    """Main function to start the game"""
+    game = GameEngine()
+    game.start_game()
+
+if __name__ == "__main__":
+    main()
